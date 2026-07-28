@@ -13,6 +13,10 @@ const fileSchema = new mongoose.Schema(
     resourceType: { type: String },
     
     size: { type: Number },
+
+    embedded: { type: Boolean, default: false },
+    extractedTextLength: { type: Number },
+    chunkCount: { type: Number },
   },
   { timestamps: true }
 );
