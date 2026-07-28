@@ -8,6 +8,7 @@ const uploadFile = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+
     const file = await File.create({
       originalName: req.file.originalname,
       url: req.file.path,
@@ -17,19 +18,31 @@ const uploadFile = async (req, res) => {
       size: req.file.size,
     });
 
-    if (file.format === "application/pdf") {
-      processFile(file._id).catch((err) =>
-        console.error("Embedding pipeline error:", err)
-      );
-    }
 
+
+    if (file.format === "application/pdf") {
+      try {
+        await processFile(file._id);
+        file.embedded = true;
+        await file.save();
+      } catch (err) {
+        file.embeddingError = err.message;
+        await file.save();
+        return res.status(200).json({
+          message: "File uploaded but embedding failed",
+          file,
+        });
+      }
+    }
     res.status(200).json({
       message: "File uploaded successfully",
       file,
     });
   } catch (error) {
     console.error("Upload error:", error);
-    res.status(500).json({ message: "File upload failed", error: error.message });
+    res
+      .status(500)
+      .json({ message: "File upload failed", error: error.message });
   }
 };
 
@@ -39,7 +52,9 @@ const listFiles = async (req, res) => {
     res.status(200).json({ files });
   } catch (error) {
     console.error("List error:", error);
-    res.status(500).json({ message: "Failed to fetch files", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch files", error: error.message });
   }
 };
 
@@ -50,13 +65,17 @@ const deleteFile = async (req, res) => {
       return res.status(404).json({ message: "File not found" });
     }
 
-    await cloudinary.uploader.destroy(file.public_id, { resource_type: file.resourceType || "image" });
+    await cloudinary.uploader.destroy(file.public_id, {
+      resource_type: file.resourceType || "image",
+    });
     await File.findByIdAndDelete(req.params.id);
 
     res.status(200).json({ message: "File deleted successfully" });
   } catch (error) {
     console.error("Delete error:", error);
-    res.status(500).json({ message: "Failed to delete file", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete file", error: error.message });
   }
 };
 

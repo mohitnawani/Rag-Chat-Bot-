@@ -15,6 +15,7 @@ const fileSchema = new mongoose.Schema(
     size: { type: Number },
 
     embedded: { type: Boolean, default: false },
+    embeddingError: { type: String },
     extractedTextLength: { type: Number },
     chunkCount: { type: Number },
   },

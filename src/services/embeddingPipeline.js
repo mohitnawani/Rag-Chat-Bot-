@@ -1,11 +1,14 @@
-const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
-const { Document } = require("@langchain/core/documents");
 const { extractTextFromPdf } = require("./extractor");
+const { chunkText } = require("./chunking");
 const { getVectorStore } = require("./vectorStore");
 const File = require("../models/File");
 
 async function processFile(fileId) {
   const file = await File.findById(fileId);
+
+  console.log(`Processing file: ${file ? file.originalName : "File not found"}`);
+
+  
   if (!file) throw new Error("File not found");
   if (file.format !== "application/pdf") {
     console.log(`Skipping non-PDF file: ${file.originalName}`);
@@ -14,23 +17,10 @@ async function processFile(fileId) {
 
   const text = await extractTextFromPdf(file.url);
 
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1000,
-    chunkOverlap: 200,
-  });
-  const chunks = await splitter.createDocuments([text]);
 
-  const docs = chunks.map(
-    (chunk) =>
-      new Document({
-        pageContent: chunk.pageContent,
-        metadata: {
-          fileId: file._id.toString(),
-          fileName: file.originalName,
-          url: file.url,
-        },
-      })
-  );
+  const docs = await chunkText(text, file._id.toString(), file.originalName, file.url);
+
+  console.log(`Extracted docs: ${docs.length} chunks for file: ${file.originalName}`);
 
   const store = await getVectorStore();
   await store.addDocuments(docs);
