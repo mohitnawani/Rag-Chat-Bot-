@@ -22,9 +22,16 @@ function buildContext(docs) {
   return docs.map((d) => d.pageContent).join("\n\n");
 }
 
-async function generateAnswer(question, context) {
+function buildHistoryBlock(history) {
+  if (!history || history.length === 0) return "";
+  const lines = history.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.text}`);
+  return `Previous conversation:\n${lines.join("\n")}\n\n`;
+}
+
+async function generateAnswer(question, context, chatHistory) {
   const ai = await getGenAI();
-  const prompt = `Answer the question based only on the following context. If you cannot answer from the context, say so.\n\nContext:\n${context}\n\nQuestion: ${question}`;
+  const historyBlock = buildHistoryBlock(chatHistory);
+  const prompt = `${historyBlock}Answer the question based only on the following context. If you cannot answer from the context, say so.\n\nContext:\n${context}\n\nQuestion: ${question}`;
 
   const interaction = await ai.interactions.create({
     model: "gemini-3.6-flash",
@@ -34,7 +41,7 @@ async function generateAnswer(question, context) {
   return interaction.output_text;
 }
 
-async function query(question, fileId, k = 5) {
+async function query(question, fileId, chatHistory, k = 5) {
   const docs = await retrieveDocuments(question, fileId, k);
 
   if (docs.length === 0) {
@@ -42,7 +49,7 @@ async function query(question, fileId, k = 5) {
   }
 
   const context = buildContext(docs);
-  const answer = await generateAnswer(question, context);
+  const answer = await generateAnswer(question, context, chatHistory);
 
   return { answer, sources: docs.map((d) => d.metadata) };
 }

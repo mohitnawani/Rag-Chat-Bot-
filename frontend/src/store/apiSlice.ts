@@ -16,28 +16,59 @@ export const deleteFile = createAsyncThunk('api/deleteFile', async (id: string) 
   return id
 })
 
-export const askQuestion = createAsyncThunk(
-  'api/askQuestion',
-  async (body: { question: string; fileId?: string }) => {
-    const res = await axiosClient.post('/upload/query', body)
+export const listChats = createAsyncThunk('api/listChats', async () => {
+  const res = await axiosClient.get('/chat')
+  return res.data.chats
+})
+
+export const createChat = createAsyncThunk('api/createChat', async () => {
+  const res = await axiosClient.post('/chat')
+  return res.data.chat
+})
+
+export const getChat = createAsyncThunk('api/getChat', async (id: string) => {
+  const res = await axiosClient.get(`/chat/${id}`)
+  return res.data.chat
+})
+
+export const deleteChat = createAsyncThunk('api/deleteChat', async (id: string) => {
+  await axiosClient.delete(`/chat/${id}`)
+  return id
+})
+
+export const askInChat = createAsyncThunk(
+  'api/askInChat',
+  async ({ chatId, question, fileId }: { chatId: string; question: string; fileId?: string }) => {
+    const res = await axiosClient.post(`/chat/${chatId}/ask`, { question, fileId })
     return res.data
   },
 )
 
 interface ApiState {
   files: any[]
+  chats: any[]
+  activeChat: any | null
   loading: boolean
 }
 
 const initialState: ApiState = {
   files: [],
+  chats: [],
+  activeChat: null,
   loading: false,
 }
 
 const apiSlice = createSlice({
   name: 'api',
   initialState,
-  reducers: {},
+  reducers: {
+    setActiveChat(state, action) {
+      state.activeChat = action.payload
+    },
+    clearActiveChat(state) {
+      state.activeChat = null
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(getFiles.pending, (state) => { state.loading = true })
@@ -46,7 +77,29 @@ const apiSlice = createSlice({
         state.files = action.payload
       })
       .addCase(getFiles.rejected, (state) => { state.loading = false })
+      .addCase(listChats.fulfilled, (state, action) => {
+        state.chats = action.payload
+      })
+      .addCase(getChat.fulfilled, (state, action) => {
+        state.activeChat = action.payload
+      })
+      .addCase(createChat.fulfilled, (state, action) => {
+        state.chats.unshift(action.payload)
+        state.activeChat = action.payload
+      })
+      .addCase(deleteChat.fulfilled, (state, action) => {
+        state.chats = state.chats.filter((c: any) => c._id !== action.payload)
+        if (state.activeChat?._id === action.payload) state.activeChat = null
+      })
+      .addCase(askInChat.fulfilled, (state, action) => {
+        if (action.payload.chat) {
+          state.activeChat = action.payload.chat
+          const idx = state.chats.findIndex((c: any) => c._id === action.payload.chat._id)
+          if (idx !== -1) state.chats[idx] = action.payload.chat
+        }
+      })
   },
 })
 
+export const { setActiveChat, clearActiveChat } = apiSlice.actions
 export default apiSlice.reducer
