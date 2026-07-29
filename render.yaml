@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: Rag_Chatbot
     buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd backend && npm install && npm start
+    startCommand: cd backend && npm install --legacy-peer-deps && npm start
     envVars:
       - key: PORT
         value: "3000"
