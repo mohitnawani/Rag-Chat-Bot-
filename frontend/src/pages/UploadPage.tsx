@@ -1,12 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { getFiles, uploadFile, deleteFile } from '../store/apiSlice'
-import { FiUpload, FiTrash2, FiFile } from 'react-icons/fi'
+import { FiUpload, FiTrash2, FiFile, FiAlertCircle } from 'react-icons/fi'
 
 export default function UploadPage() {
   const dispatch = useDispatch<any>()
   const { files, loading } = useSelector((state: any) => state.api)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     dispatch(getFiles())
@@ -15,10 +16,15 @@ export default function UploadPage() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setError('')
     const formData = new FormData()
     formData.append('file', file)
-    await dispatch(uploadFile(formData))
-    dispatch(getFiles())
+    const res = await dispatch(uploadFile(formData))
+    if (uploadFile.rejected.match(res)) {
+      setError((res.payload as any)?.message || 'Upload failed')
+    } else {
+      dispatch(getFiles())
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -37,6 +43,13 @@ export default function UploadPage() {
         </button>
         <input ref={inputRef} type="file" accept=".pdf" onChange={handleUpload} hidden />
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+          <FiAlertCircle />
+          <span className="text-sm">{error}</span>
+        </div>
+      )}
 
       {loading ? (
         <p>Loading...</p>
