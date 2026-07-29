@@ -6,7 +6,17 @@ const { askQuestion } = require("../controllers/queryController");
 const { extractTextFromPdf } = require("../services/extractor");
 
 router.get("/getfiles", listFiles);
-router.post("/", upload.single("file"), uploadFile);
+router.post("/", (req, res, next) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      const message = err.code === "LIMIT_FILE_SIZE"
+        ? "File too large"
+        : err.message || "Upload to Cloudinary failed";
+      return res.status(400).json({ message });
+    }
+    next();
+  });
+}, uploadFile);
 router.delete("/:id", deleteFile);
 
 router.post("/extract", async (req, res) => {
