@@ -1,6 +1,6 @@
 const { extractTextFromPdf } = require("./extractor");
 const { chunkText } = require("./chunking");
-const { getVectorStore } = require("./vectorStore");
+const { storeEmbeddings } = require("./vectorStore");
 const File = require("../models/File");
 
 async function processFile(fileId) {
@@ -17,15 +17,18 @@ async function processFile(fileId) {
 
   const text = await extractTextFromPdf(file.url);
 
+  console.log(text)
+
 
   const docs = await chunkText(text, file._id.toString(), file.originalName, file.url);
 
-  console.log(`Extracted docs: ${docs.length} chunks for file: ${file.originalName}`);
+  console.log(docs)
 
-  const store = await getVectorStore();
-  await store.addDocuments(docs);
+
+  await storeEmbeddings(docs);
 
   file.embedded = true;
+  file.embeddingError = undefined;
   file.extractedTextLength = text.length;
   file.chunkCount = docs.length;
   await file.save();

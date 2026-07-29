@@ -10,8 +10,9 @@ async function chunkText(text, fileId, fileName, url) {
   const chunks = await splitter.createDocuments([text]);
 
   return chunks.map(
-    (chunk) =>
+    (chunk, index) =>
       new Document({
+        id: `${fileId}-${index}`,
         pageContent: chunk.pageContent,
         metadata: { fileId, fileName, url },
       })

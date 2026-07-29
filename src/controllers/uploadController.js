@@ -1,6 +1,7 @@
 const File = require("../models/File");
 const cloudinary = require("../config/cloudinary");
 const { processFile } = require("../services/embeddingPipeline");
+const { deleteFileEmbeddings } = require("../services/vectorStore");
 
 const uploadFile = async (req, res) => {
   try {
@@ -63,6 +64,10 @@ const deleteFile = async (req, res) => {
     const file = await File.findById(req.params.id);
     if (!file) {
       return res.status(404).json({ message: "File not found" });
+    }
+
+    if (file.embedded) {
+      await deleteFileEmbeddings(file._id.toString());
     }
 
     await cloudinary.uploader.destroy(file.public_id, {
