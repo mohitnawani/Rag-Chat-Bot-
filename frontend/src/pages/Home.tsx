@@ -11,17 +11,17 @@ export default function Home() {
   const navigate = useNavigate()
 
   return (
-    <div className="flex flex-col items-center justify-center mt-20 gap-6">
-      <h1 className="text-4xl font-bold">RAG Chatbot</h1>
-      <p className="text-gray-500 text-lg">Upload PDFs and ask questions about them</p>
-      <div className="flex gap-4 mt-4">
+    <div className="flex flex-col items-center justify-center mt-10 sm:mt-20 gap-6 px-4">
+      <h1 className="text-3xl sm:text-4xl font-bold text-center">RAG Chatbot</h1>
+      <p className="text-gray-500 text-base sm:text-lg text-center">Upload PDFs and ask questions about them</p>
+      <div className="flex flex-col sm:flex-row gap-4 mt-4 w-full sm:w-auto">
         {cards.map(({ icon: Icon, label, color, path }) => (
           <button
             key={label}
             onClick={() => navigate(path)}
-            className="flex flex-col items-center p-6 bg-white rounded-xl shadow-sm border w-40 hover:shadow-md hover:border-blue-300 transition cursor-pointer"
+            className="flex items-center sm:flex-col gap-4 sm:gap-2 p-4 sm:p-6 bg-white rounded-xl shadow-sm border w-full sm:w-40 hover:shadow-md hover:border-blue-300 transition cursor-pointer"
           >
-            <Icon className={`text-3xl ${color} mb-2`} />
+            <Icon className={`text-2xl sm:text-3xl ${color}`} />
             <span className="font-medium">{label}</span>
           </button>
         ))}

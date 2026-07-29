@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import {
   listChats, createChat, getChat, deleteChat, askInChat, getFiles, clearActiveChat,
 } from '../store/apiSlice'
-import { FiSend, FiMessageSquare, FiPlus, FiTrash2, FiChevronLeft } from 'react-icons/fi'
+import { FiSend, FiMessageSquare, FiPlus, FiTrash2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -56,10 +56,12 @@ export default function ChatPage() {
 
   const handleNewChat = () => {
     dispatch(clearActiveChat())
+    setSidebarOpen(false)
   }
 
   const handleSelectChat = (id: string) => {
     dispatch(getChat(id))
+    setSidebarOpen(false)
   }
 
   const handleDeleteChat = (e: React.MouseEvent, id: string) => {
@@ -88,15 +90,18 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-80px)] gap-0">
+    <div className="flex h-[calc(100vh-80px)] sm:h-[calc(100vh-88px)] gap-0 relative">
       {sidebarOpen && (
-        <div className="w-72 border-r bg-white flex flex-col shrink-0">
-          <div className="p-3 border-b">
+        <div className="absolute sm:relative z-10 inset-0 sm:inset-auto w-full sm:w-72 border-r bg-white flex flex-col shrink-0">
+          <div className="flex items-center justify-between p-3 border-b">
             <button
               onClick={handleNewChat}
-              className="flex items-center justify-center gap-2 w-full py-2 border-2 border-dashed rounded-lg text-gray-500 hover:bg-gray-50"
+              className="flex items-center justify-center gap-2 w-full py-2 border-2 border-dashed rounded-lg text-gray-500 hover:bg-gray-50 mr-2"
             >
               <FiPlus /> New Chat
+            </button>
+            <button onClick={() => setSidebarOpen(false)} className="sm:hidden p-1 text-gray-400">
+              <FiChevronRight />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -124,7 +129,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-2 p-3 border-b bg-white">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -135,7 +140,7 @@ export default function ChatPage() {
           <select
             value={selectedFile}
             onChange={(e) => setSelectedFile(e.target.value)}
-            className="p-1.5 border rounded-lg text-sm"
+            className="p-1.5 border rounded-lg text-sm flex-1 sm:flex-none"
           >
             <option value="">All files</option>
             {files?.map((f: any) => (
@@ -144,11 +149,11 @@ export default function ChatPage() {
           </select>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
           {!activeChat ? (
             <div className="flex flex-col items-center text-gray-400 mt-20">
               <FiMessageSquare className="text-5xl mb-3" />
-              <p>Select a chat or start a new one</p>
+              <p className="text-center">Select a chat or start a new one</p>
             </div>
           ) : activeChat.messages?.length === 0 ? (
             <div className="flex flex-col items-center text-gray-400 mt-20">
@@ -159,10 +164,8 @@ export default function ChatPage() {
             activeChat.messages?.map((msg: any, i: number) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg prose prose-sm max-w-none ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100'
+                  className={`max-w-[85%] sm:max-w-[70%] p-3 rounded-lg whitespace-pre-wrap ${
+                    msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'
                   }`}
                 >
                   {msg.role === 'user' ? msg.text : <ChatMessage text={msg.text} />}
@@ -178,14 +181,14 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t bg-white">
+        <div className="p-3 sm:p-4 border-t bg-white">
           <div className="flex gap-2 max-w-4xl mx-auto">
             <input
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              placeholder={activeChat ? 'Ask a follow-up...' : 'Type your question to start a new chat...'}
-              className="flex-1 p-3 border rounded-lg"
+              placeholder={activeChat ? 'Ask a follow-up...' : 'Type your question...'}
+              className="flex-1 p-3 border rounded-lg text-sm sm:text-base"
               disabled={sending}
             />
             <button

@@ -27,8 +27,7 @@ export default function UploadPage() {
     setUploading(false)
 
     if (uploadFile.rejected.match(res)) {
-      const payload = res.payload as any
-      setError(payload?.message || 'Upload failed')
+      setError((res.payload as any)?.message || 'Upload failed')
       return
     }
 
@@ -48,12 +47,12 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-8">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="max-w-2xl mx-auto mt-4 sm:mt-8 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 w-full sm:w-auto justify-center"
         >
           {uploading ? (
             <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
@@ -72,9 +71,9 @@ export default function UploadPage() {
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 p-3 mb-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+        <div className="flex items-start gap-2 p-3 mb-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
           <FiAlertTriangle className="mt-0.5 shrink-0" />
-          <span className="text-sm">{error}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -83,13 +82,13 @@ export default function UploadPage() {
       ) : (
         <div className="space-y-2">
           {files?.map((file: any) => (
-            <div key={file._id} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border">
+            <div key={file._id} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <FiFile className="text-gray-400 shrink-0" />
-                <span className="truncate">{file.originalName}</span>
+                <span className="truncate text-sm sm:text-base">{file.originalName}</span>
                 {file.embeddingError && (
                   <span className="text-xs text-amber-600 shrink-0" title={file.embeddingError}>
-                    <FiAlertTriangle className="inline" /> embedding failed
+                    <FiAlertTriangle className="inline" /> failed
                   </span>
                 )}
                 {file.embedded && (
@@ -101,7 +100,7 @@ export default function UploadPage() {
               </button>
             </div>
           ))}
-          {files?.length === 0 && <p className="text-gray-400">No files uploaded yet.</p>}
+          {files?.length === 0 && <p className="text-gray-400 text-center sm:text-left">No files uploaded yet.</p>}
         </div>
       )}
     </div>
