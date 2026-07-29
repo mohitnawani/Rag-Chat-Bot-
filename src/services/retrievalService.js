@@ -1,7 +1,13 @@
 const { getVectorStore } = require("./vectorStore");
-const { ChatGoogleGenerativeAI } = require("@langchain/google-genai");
-const { ChatPromptTemplate } = require("@langchain/core/prompts");
-const { StringOutputParser } = require("@langchain/core/output_parsers");
+
+let genai;
+async function getGenAI() {
+  if (!genai) {
+    const { GoogleGenAI } = await import("@google/genai");
+    genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return genai;
+}
 
 async function retrieveDocuments(question, fileId, k = 5) {
   const store = await getVectorStore();
@@ -17,18 +23,15 @@ function buildContext(docs) {
 }
 
 async function generateAnswer(question, context) {
-  const llm = new ChatGoogleGenerativeAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-2.0-flash",
+  const ai = await getGenAI();
+  const prompt = `Answer the question based only on the following context. If you cannot answer from the context, say so.\n\nContext:\n${context}\n\nQuestion: ${question}`;
+
+  const interaction = await ai.interactions.create({
+    model: "gemini-3.6-flash",
+    input: prompt,
+    generation_config: { thinking_level: "low" },
   });
-
-  const prompt = ChatPromptTemplate.fromMessages([
-    ["system", "Answer the question based only on the following context. If you cannot answer from the context, say so.\n\nContext: {context}"],
-    ["human", "{question}"],
-  ]);
-
-  const chain = prompt.pipe(llm).pipe(new StringOutputParser());
-  return await chain.invoke({ context, question });
+  return interaction.output_text;
 }
 
 async function query(question, fileId, k = 5) {

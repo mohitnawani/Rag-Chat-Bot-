@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google/genai": "^2.13.0",
     "@google/generative-ai": "^0.24.1",
     "@langchain/core": "^1.2.3",
     "@langchain/google-genai": "^2.2.0",
