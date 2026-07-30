@@ -1,9 +1,12 @@
 const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 const { uploadFile, listFiles, deleteFile } = require("../controllers/uploadController");
 const { askQuestion } = require("../controllers/queryController");
 const { extractTextFromPdf } = require("../services/extractor");
+
+router.use(authMiddleware);
 
 router.get("/getfiles", listFiles);
 router.post("/", (req, res, next) => {

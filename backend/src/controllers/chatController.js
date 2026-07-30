@@ -3,7 +3,7 @@ const { query } = require("../services/retrievalService");
 
 const listChats = async (req, res) => {
   try {
-    const chats = await Chat.find()
+    const chats = await Chat.find({ user: req.user.id })
       .select("title createdAt updatedAt")
       .sort({ updatedAt: -1 });
     res.json({ chats });
@@ -14,7 +14,7 @@ const listChats = async (req, res) => {
 
 const createChat = async (req, res) => {
   try {
-    const chat = await Chat.create({});
+    const chat = await Chat.create({ user: req.user.id });
     res.status(201).json({ chat });
   } catch (error) {
     res.status(500).json({ message: "Failed to create chat", error: error.message });
@@ -23,7 +23,7 @@ const createChat = async (req, res) => {
 
 const getChat = async (req, res) => {
   try {
-    const chat = await Chat.findById(req.params.id);
+    const chat = await Chat.findOne({ _id: req.params.id, user: req.user.id });
     if (!chat) return res.status(404).json({ message: "Chat not found" });
     res.json({ chat });
   } catch (error) {
@@ -33,7 +33,7 @@ const getChat = async (req, res) => {
 
 const deleteChat = async (req, res) => {
   try {
-    const chat = await Chat.findByIdAndDelete(req.params.id);
+    const chat = await Chat.findOneAndDelete({ _id: req.params.id, user: req.user.id });
     if (!chat) return res.status(404).json({ message: "Chat not found" });
     res.json({ message: "Chat deleted" });
   } catch (error) {
@@ -46,7 +46,7 @@ const askInChat = async (req, res) => {
     const { question, fileId } = req.body;
     if (!question) return res.status(400).json({ message: "Question is required" });
 
-    const chat = await Chat.findById(req.params.id);
+    const chat = await Chat.findOne({ _id: req.params.id, user: req.user.id });
     if (!chat) return res.status(404).json({ message: "Chat not found" });
 
     chat.messages.push({ role: "user", text: question });

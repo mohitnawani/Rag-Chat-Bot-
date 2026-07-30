@@ -5,11 +5,18 @@ require("dotenv").config();
 const connectDB = require("./src/config/db");
 const cors = require("cors");
 
-app.use(cors());
+const cookieParser = require("cookie-parser");
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser());
 
+const authRoutes = require("./src/routes/authRoutes");
 const uploadRoutes = require("./src/routes/uploadRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");
+app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/chat", chatRoutes);
 

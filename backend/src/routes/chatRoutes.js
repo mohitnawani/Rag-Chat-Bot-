@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../middleware/authMiddleware");
 const {
   listChats,
   createChat,
@@ -7,6 +8,8 @@ const {
   deleteChat,
   askInChat,
 } = require("../controllers/chatController");
+
+router.use(authMiddleware);
 
 router.get("/", listChats);
 router.post("/", createChat);

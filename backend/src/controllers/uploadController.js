@@ -11,6 +11,7 @@ const uploadFile = async (req, res) => {
 
 
     const file = await File.create({
+      user: req.user.id,
       originalName: req.file.originalname,
       url: req.file.path,
       public_id: req.file.filename,
@@ -49,7 +50,7 @@ const uploadFile = async (req, res) => {
 
 const listFiles = async (req, res) => {
   try {
-    const files = await File.find().sort({ createdAt: -1 });
+    const files = await File.find({ user: req.user.id }).sort({ createdAt: -1 });
     res.status(200).json({ files });
   } catch (error) {
     console.error("List error:", error);
@@ -61,7 +62,7 @@ const listFiles = async (req, res) => {
 
 const deleteFile = async (req, res) => {
   try {
-    const file = await File.findById(req.params.id);
+    const file = await File.findOne({ _id: req.params.id, user: req.user.id });
     if (!file) {
       return res.status(404).json({ message: "File not found" });
     }
