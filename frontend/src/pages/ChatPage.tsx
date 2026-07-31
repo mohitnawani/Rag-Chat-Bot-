@@ -4,44 +4,18 @@ import {
   listChats, createChat, getChat, deleteChat, askInChat, getFiles, clearActiveChat,
 } from '../store/apiSlice'
 import { FiSend, FiPlus, FiTrash2, FiChevronLeft, FiChevronRight, FiFile } from 'react-icons/fi'
-import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import CitationTab, { type Source } from '../components/CitationTab'
-
-function formatTime(ts?: string) {
-  if (!ts) return ''
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
+import MessageBubble, { ChatEmptyState } from '../components/MessageBubble'
 
 function formatDate(ts?: string) {
   if (!ts) return ''
   return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-function ChatMessage({ text, dark }: { text: string; dark: boolean }) {
-  return (
-    <div className="md">
-      <ReactMarkdown
-        components={{
-          code({ className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '')
-            if (match) {
-              return (
-                <SyntaxHighlighter style={dark ? oneDark : oneLight} language={match[1]} PreTag="div">
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
-              )
-            }
-            return <code className={className} {...props}>{children}</code>
-          },
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-    </div>
-  )
-}
+const EXAMPLE_QUESTIONS = [
+  'What is this document about?',
+  'Summarize the key points',
+  'What are the main conclusions?',
+]
 
 export default function ChatPage() {
   const dispatch = useDispatch<any>()
@@ -55,7 +29,6 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const dark = useSelector((state: any) => state.theme.mode) === 'dark'
 
   useEffect(() => {
     dispatch(listChats())
@@ -77,7 +50,6 @@ export default function ChatPage() {
   const handleSelectChat = (id: string) => {
     localStorage.setItem('activeChatId', id)
     dispatch(getChat(id))
-    setSidebarOpen(false)
   }
 
   const handleDeleteChat = (e: React.MouseEvent, id: string) => {
@@ -208,45 +180,20 @@ export default function ChatPage() {
               </button>
             </div>
           ) : activeChat.messages?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <h2 className="font-serif text-2xl text-ink">Ask something about your documents</h2>
-              <p className="text-sm text-mute mt-2 max-w-sm">
-                Answers come from your files only. Amber tabs on the left of each answer mark the source passage.
-              </p>
-            </div>
+            <ChatEmptyState exampleQuestions={EXAMPLE_QUESTIONS} onPick={(q) => setQuestion(q)} />
           ) : (
             activeChat.messages?.filter((msg: any) => msg.role === 'assistant').map((msg: any, i: number) => (
-              <div
+              <MessageBubble
                 key={i}
-                className="flex w-full items-start gap-0 animate-rise"
-              >
-                <div className="w-9 shrink-0 flex flex-col items-center gap-1.5 pt-1">
-                  {(msg.sources as Source[] | undefined)?.map((s, j) => (
-                    <CitationTab key={j} source={s} index={j} />
-                  ))}
-                </div>
-                <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
-                  <p className="font-mono text-[10px] text-mute mb-1">{formatTime(msg.timestamp)}</p>
-                  <div className="bg-card border border-line rounded-md p-4 text-sm text-ink">
-                    <ChatMessage text={msg.text} dark={dark} />
-                  </div>
-                </div>
-              </div>
+                role="assistant"
+                content={msg.text}
+                citations={msg.sources ?? null}
+                timestamp={msg.timestamp}
+              />
             ))
           )}
           {sending && (
-            <div className="flex justify-start animate-rise">
-              <div className="w-9 shrink-0" />
-              <div className="max-w-[75%]">
-                <div className="bg-card border border-line rounded-md px-4 py-3.5">
-                  <div className="flex gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-mute/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 bg-mute/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 bg-mute/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <MessageBubble role="assistant" content="" isStreaming />
           )}
           {chatError && (
             <div className="flex justify-start animate-rise">

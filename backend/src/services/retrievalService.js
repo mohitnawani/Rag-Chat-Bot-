@@ -61,6 +61,8 @@ Answer:`;
 async function query(question, fileId, chatHistory, k = 5) {
   const docs = await retrieveDocuments(question, fileId, k);
 
+  console.log(`Retrieved ${docs.length} documents for question: "${question}"`);
+
   if (docs.length === 0) {
     return { answer: "No relevant documents found to answer your question.", sources: [] };
   }
