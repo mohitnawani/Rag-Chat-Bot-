@@ -9,10 +9,11 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={() => dispatch(toggleTheme())}
-      className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition"
-      aria-label="Toggle theme"
+      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-mute hover:text-ink border border-line rounded-md hover:border-pine/40 transition"
+      aria-label={mode === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
     >
-      {mode === 'light' ? <FiMoon size={18} /> : <FiSun size={18} />}
+      {mode === 'light' ? <FiMoon size={14} /> : <FiSun size={14} />}
+      <span className="hidden md:inline">{mode === 'light' ? 'Dark' : 'Light'}</span>
     </button>
   )
 }

@@ -38,9 +38,13 @@ export const deleteChat = createAsyncThunk('api/deleteChat', async (id: string) 
 
 export const askInChat = createAsyncThunk(
   'api/askInChat',
-  async ({ chatId, question, fileId }: { chatId: string; question: string; fileId?: string }) => {
-    const res = await axiosClient.post(`/chat/${chatId}/ask`, { question, fileId })
-    return res.data
+  async ({ chatId, question, fileId }: { chatId: string; question: string; fileId?: string }, { rejectWithValue }) => {
+    try {
+      const res = await axiosClient.post(`/chat/${chatId}/ask`, { question, fileId })
+      return res.data
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'The answer could not be generated. Try again.')
+    }
   },
 )
 
@@ -49,6 +53,8 @@ interface ApiState {
   chats: any[]
   activeChat: any | null
   loading: boolean
+  chatLoading: boolean
+  chatError: string | null
 }
 
 const initialState: ApiState = {
@@ -56,6 +62,8 @@ const initialState: ApiState = {
   chats: [],
   activeChat: null,
   loading: false,
+  chatLoading: false,
+  chatError: null,
 }
 
 const apiSlice = createSlice({
@@ -77,12 +85,16 @@ const apiSlice = createSlice({
         state.files = action.payload
       })
       .addCase(getFiles.rejected, (state) => { state.loading = false })
+      
       .addCase(listChats.fulfilled, (state, action) => {
         state.chats = action.payload
       })
+      .addCase(getChat.pending, (state) => { state.chatLoading = true })
       .addCase(getChat.fulfilled, (state, action) => {
+        state.chatLoading = false
         state.activeChat = action.payload
       })
+      .addCase(getChat.rejected, (state) => { state.chatLoading = false })
       .addCase(createChat.fulfilled, (state, action) => {
         state.chats.unshift(action.payload)
         state.activeChat = action.payload
@@ -91,12 +103,16 @@ const apiSlice = createSlice({
         state.chats = state.chats.filter((c: any) => c._id !== action.payload)
         if (state.activeChat?._id === action.payload) state.activeChat = null
       })
+      .addCase(askInChat.pending, (state) => { state.chatError = null })
       .addCase(askInChat.fulfilled, (state, action) => {
         if (action.payload.chat) {
           state.activeChat = action.payload.chat
           const idx = state.chats.findIndex((c: any) => c._id === action.payload.chat._id)
           if (idx !== -1) state.chats[idx] = action.payload.chat
         }
+      })
+      .addCase(askInChat.rejected, (state, action) => {
+        state.chatError = action.payload as string || 'The answer could not be generated. Try again.'
       })
   },
 })

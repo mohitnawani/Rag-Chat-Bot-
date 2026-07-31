@@ -14,7 +14,7 @@ async function chunkText(text, fileId, fileName, url) {
       new Document({
         id: `${fileId}-${index}`,
         pageContent: chunk.pageContent,
-        metadata: { fileId, fileName, url },
+        metadata: { fileId, fileName, url, chunk: index + 1 },
       })
   );
 }

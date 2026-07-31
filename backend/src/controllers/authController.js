@@ -1,8 +1,60 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/user");
 const generateToken = require("../middleware/tokenMiddleware");
 const redis = require("../config/redis");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+exports.googleVerify = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub } = payload;
+    const normalizedEmail = email.trim().toLowerCase();
+
+    let user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      user = await User.create({
+        name: name || "Google User",
+        email: normalizedEmail,
+        password: null,
+        googleId: sub,
+        picture: picture || null,
+      });
+    } else if (!user.googleId) {
+      user.googleId = sub;
+      await user.save();
+    }
+
+    const jwtToken = generateToken(user);
+
+    res.cookie("token", jwtToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      token: jwtToken,
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Google verification failed", error: err.message });
+  }
+};
+
 
 exports.signup = async (req, res) => {
   try {
@@ -52,7 +104,9 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const isMatch = await bcrypt.compare(password.trim(), user.password);
+    const isMatch = user.password
+      ? await bcrypt.compare(password.trim(), user.password)
+      : false;
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }

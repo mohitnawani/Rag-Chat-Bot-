@@ -11,12 +11,14 @@ interface AuthState {
   user: User | null
   loading: boolean
   error: string | null
+  checked: boolean
 }
 
 const initialState: AuthState = {
   user: null,
   loading: false,
   error: null,
+  checked: false,
 }
 
 export const signup = createAsyncThunk(
@@ -73,28 +75,35 @@ const authSlice = createSlice({
       .addCase(signup.fulfilled, (state, action) => {
         state.loading = false
         state.user = action.payload
+        state.checked = true
       })
       .addCase(signup.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
+        state.checked = true
       })
       .addCase(login.pending, (state) => { state.loading = true; state.error = null })
       .addCase(login.fulfilled, (state, action) => {
         state.loading = false
         state.user = action.payload
+        state.checked = true
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
+        state.checked = true
       })
       .addCase(logout.fulfilled, (state) => {
         state.user = null
+        state.checked = true
       })
       .addCase(checkAuth.fulfilled, (state, action) => {
         state.user = action.payload
+        state.checked = true
       })
       .addCase(checkAuth.rejected, (state) => {
         state.user = null
+        state.checked = true
       })
   },
 })

@@ -31,7 +31,24 @@ function buildHistoryBlock(history) {
 async function generateAnswer(question, context, chatHistory) {
   const ai = await getGenAI();
   const historyBlock = buildHistoryBlock(chatHistory);
-  const prompt = `${historyBlock}Answer the question based only on the following context. If you cannot answer from the context, say so.\n\nContext:\n${context}\n\nQuestion: ${question}`;
+const prompt = `${historyBlock}You are a helpful RAG-based document assistant. Follow these rules when responding:
+
+1. **Greetings/small talk** (e.g. "hi", "hello", "how are you"): Respond warmly and briefly introduce yourself — e.g. "Hello! I'm a RAG chatbot that can answer questions about your uploaded document. What would you like to know?" Do not use the context for this.
+
+2. **General/meta questions about your capabilities** (e.g. "what can you do?", "who are you?"): Explain that you can answer questions based on the provided document/context.
+
+3. **Questions answerable from the context**: Answer accurately and concisely using ONLY the information in the context below. Do not add outside knowledge.
+
+4. **Questions NOT answerable from the context** (including personal, unrelated, or general knowledge questions not covered by the document): Politely say you can't answer that and redirect the user — e.g. "I can only answer questions related to the uploaded document. Could you ask something about it?"
+
+5. Keep responses natural and conversational, not robotic. Avoid repeating "based on the context" in every reply.
+
+Context:
+${context}
+
+Question: ${question}
+
+Answer:`;
 
   const interaction = await ai.interactions.create({
     model: "gemini-3.6-flash",
@@ -51,7 +68,16 @@ async function query(question, fileId, chatHistory, k = 5) {
   const context = buildContext(docs);
   const answer = await generateAnswer(question, context, chatHistory);
 
-  return { answer, sources: docs.map((d) => d.metadata) };
+  return {
+    answer,
+    sources: docs.map((d, i) => ({
+      fileId: d.metadata.fileId,
+      fileName: d.metadata.fileName,
+      url: d.metadata.url,
+      chunk: d.metadata.chunk ?? i + 1,
+      excerpt: d.pageContent.slice(0, 240).trim(),
+    })),
+  };
 }
 
 module.exports = { query, retrieveDocuments, buildContext, generateAnswer };

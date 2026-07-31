@@ -1,7 +1,6 @@
-import { useEffect } from 'react'
-import { Routes, Route, Link, useNavigate } from 'react-router'
-import { FiUpload, FiMessageSquare, FiMenu, FiLogIn, FiLogOut, FiHome } from 'react-icons/fi'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router'
+import { FiUpload, FiMessageSquare, FiMenu, FiLogIn, FiLogOut, FiHome, FiX } from 'react-icons/fi'
 import { useDispatch, useSelector } from 'react-redux'
 import { checkAuth, logout } from './slices/authSlice'
 import ThemeToggle from './components/ThemeToggle'
@@ -9,15 +8,56 @@ import Home from './pages/Home'
 import UploadPage from './pages/UploadPage'
 import ChatPage from './pages/ChatPage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+
+
+const navItems = [
+  { to: '/', label: 'Home', icon: FiHome },
+  { to: '/upload', label: 'Upload', icon: FiUpload },
+  { to: '/chat', label: 'Chat', icon: FiMessageSquare },
+]
+
+function NavLinkItem({ to, label, icon: Icon, onNavigate, showUnderline = true }: { to: string; label: string; icon: React.ElementType; onNavigate?: () => void; showUnderline?: boolean }) {
+  return (
+    <NavLink
+      to={to}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        `relative flex items-center gap-1.5 px-3 py-1.5 text-sm transition ${
+          isActive ? 'text-pine' : 'text-mute hover:text-ink'
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <Icon size={15} />
+          {label}
+          {isActive && showUnderline && <span className="absolute -bottom-[11px] left-1/2 -translate-x-1/2 h-[3px] w-4 bg-pine" />}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+let authChecked = false
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useSelector((state: any) => state.auth.user)
+  const checked = useSelector((state: any) => state.auth.checked)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    if (!user) navigate('/login', { replace: true })
-  }, [user])
+    if (checked && !user) navigate('/login', { replace: true, state: { from: location.pathname } })
+  }, [checked, user])
 
+  if (!checked) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <span className="w-5 h-5 border-2 border-line border-t-pine rounded-full animate-spin" />
+      </div>
+    )
+  }
   return user ? <>{children}</> : null
 }
 
@@ -32,46 +72,73 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
+    if (authChecked) return
+    authChecked = true
     dispatch(checkAuth())
   }, [dispatch])
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
-      <nav className="flex items-center justify-between p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50">
-        <Link to="/" className="text-lg font-bold tracking-tight">RAG Chatbot</Link>
+    <div className="min-h-screen bg-paper text-ink">
+      <nav className="flex items-center justify-between px-4 sm:px-6 py-4 bg-paper/90 backdrop-blur border-b border-line sticky top-0 z-50">
+        <NavLink to="/" className="flex items-center gap-2.5 group">
+          <span className="w-2.5 h-3 bg-pine group-hover:bg-pine-deep transition-colors" />
+          <span className="font-serif text-lg font-semibold tracking-tight">RAG Chatbot</span>
+        </NavLink>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <button className="sm:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setMenuOpen(!menuOpen)}>
-            <FiMenu className="text-xl" />
+          <button
+            className="sm:hidden p-2 text-mute hover:text-ink transition"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {menuOpen ? <FiX className="text-xl" /> : <FiMenu className="text-xl" />}
           </button>
           <div className="hidden sm:flex items-center gap-1">
             {user ? (
               <>
-                <Link to="/" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"><FiHome size={15} /> Home</Link>
-                <Link to="/upload" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"><FiUpload size={15} /> Upload</Link>
-                <Link to="/chat" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"><FiMessageSquare size={15} /> Chat</Link>
-                <span className="h-5 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
-                <span className="text-sm text-gray-500 dark:text-gray-400 px-2">{user.name}</span>
-                <button onClick={() => dispatch(logout())} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"><FiLogOut size={15} /> Logout</button>
+                {navItems.map((item) => (
+                  <NavLinkItem key={item.to} {...item} />
+                ))}
+                <span className="h-5 w-px bg-line mx-2" />
+                <span className="text-sm text-mute px-2">{user.name}</span>
+                <button
+                  onClick={() => dispatch(logout())}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-mute hover:text-error transition"
+                >
+                  <FiLogOut size={15} /> Logout
+                </button>
               </>
             ) : (
-              <Link to="/login" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"><FiLogIn size={15} /> Login</Link>
+              <NavLink to="/login" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-mute hover:text-ink transition">
+                <FiLogIn size={15} /> Login
+              </NavLink>
             )}
           </div>
         </div>
       </nav>
       {menuOpen && (
-        <div className="sm:hidden flex flex-col gap-1 p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="sm:hidden flex flex-col gap-1 p-3 bg-paper border-b border-line shadow-sm">
           {user ? (
             <>
-              <span className="text-sm text-gray-500 dark:text-gray-400 px-3 py-1">{user.name}</span>
-              <Link to="/" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" onClick={() => setMenuOpen(false)}><FiHome /> Home</Link>
-              <Link to="/upload" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" onClick={() => setMenuOpen(false)}><FiUpload /> Upload</Link>
-              <Link to="/chat" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" onClick={() => setMenuOpen(false)}><FiMessageSquare /> Chat</Link>
-              <button onClick={() => { dispatch(logout()); setMenuOpen(false) }} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"><FiLogOut /> Logout</button>
+              <span className="text-sm text-mute px-3 py-1">{user.name}</span>
+              {navItems.map((item) => (
+                <NavLinkItem key={item.to} {...item} onNavigate={() => setMenuOpen(false)} showUnderline={false} />
+              ))}
+              <button
+                onClick={() => { dispatch(logout()); setMenuOpen(false) }}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-mute hover:text-error transition"
+              >
+                <FiLogOut /> Logout
+              </button>
             </>
           ) : (
-            <Link to="/login" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" onClick={() => setMenuOpen(false)}><FiLogIn /> Login</Link>
+            <NavLink
+              to="/login"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-mute hover:text-ink transition"
+            >
+              <FiLogIn /> Login
+            </NavLink>
           )}
         </div>
       )}
@@ -79,6 +146,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<RegisterPage />} />
           <Route path="/upload" element={<ProtectedRoute><UploadPage /></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         </Routes>

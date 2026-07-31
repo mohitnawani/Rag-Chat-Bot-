@@ -55,16 +55,27 @@ const askInChat = async (req, res) => {
       chat.title = question.length > 50 ? question.slice(0, 50) + "..." : question;
     }
 
+    await chat.save();
+
     const chatHistory = chat.messages.slice(0, -1);
     const result = await query(question, fileId, chatHistory);
     const answer = result.answer || "No response generated.";
 
-    chat.messages.push({ role: "assistant", text: answer });
+    chat.messages.push({ role: "assistant", text: answer, sources: result.sources || [] });
     await chat.save();
 
     res.json({ answer, sources: result.sources || [], chat });
   } catch (error) {
-    res.status(500).json({ message: "Query failed", error: error.message });
+    const message = error?.message || "";
+    const isQuota = message.includes("quota") || message.includes("429");
+    const isRateLimit = message.includes("rate") || message.includes("429 Too Many");
+    if (isQuota) {
+      return res.status(429).json({ message: "The AI service is out of quota. Try again later." });
+    }
+    if (isRateLimit) {
+      return res.status(429).json({ message: "The AI service is rate-limited. Wait a moment and try again." });
+    }
+    res.status(500).json({ message: "The answer could not be generated. Try again." });
   }
 };
 

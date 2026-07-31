@@ -3,34 +3,43 @@ import { useDispatch, useSelector } from 'react-redux'
 import {
   listChats, createChat, getChat, deleteChat, askInChat, getFiles, clearActiveChat,
 } from '../store/apiSlice'
-import { FiSend, FiMessageSquare, FiPlus, FiTrash2, FiChevronLeft, FiChevronRight, FiFile } from 'react-icons/fi'
+import { FiSend, FiPlus, FiTrash2, FiChevronLeft, FiChevronRight, FiFile } from 'react-icons/fi'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import CitationTab, { type Source } from '../components/CitationTab'
 
-function ChatMessage({ text }: { text: string }) {
+function formatTime(ts?: string) {
+  if (!ts) return ''
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDate(ts?: string) {
+  if (!ts) return ''
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+function ChatMessage({ text, dark }: { text: string; dark: boolean }) {
   return (
-    <ReactMarkdown
-      components={{
-        code({ className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '')
-          if (match) {
-            return (
-              <SyntaxHighlighter style={oneDark} language={match[1]} PreTag="div">
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            )
-          }
-          return (
-            <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded text-sm" {...props}>
-              {children}
-            </code>
-          )
-        },
-      }}
-    >
-      {text}
-    </ReactMarkdown>
+    <div className="md">
+      <ReactMarkdown
+        components={{
+          code({ className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '')
+            if (match) {
+              return (
+                <SyntaxHighlighter style={dark ? oneDark : oneLight} language={match[1]} PreTag="div">
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              )
+            }
+            return <code className={className} {...props}>{children}</code>
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
   )
 }
 
@@ -39,33 +48,41 @@ export default function ChatPage() {
   const chats = useSelector((state: any) => state.api.chats)
   const activeChat = useSelector((state: any) => state.api.activeChat)
   const files = useSelector((state: any) => state.api.files)
+  const chatError = useSelector((state: any) => state.api.chatError)
+  const chatLoading = useSelector((state: any) => state.api.chatLoading)
   const [question, setQuestion] = useState('')
   const [selectedFile, setSelectedFile] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const dark = useSelector((state: any) => state.theme.mode) === 'dark'
 
   useEffect(() => {
     dispatch(listChats())
     dispatch(getFiles(undefined))
+    const storedId = localStorage.getItem('activeChatId')
+    if (storedId) dispatch(getChat(storedId))
   }, [dispatch])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activeChat?.messages])
+  }, [activeChat?.messages, sending])
 
   const handleNewChat = () => {
     dispatch(clearActiveChat())
+    localStorage.removeItem('activeChatId')
     setSidebarOpen(false)
   }
 
   const handleSelectChat = (id: string) => {
+    localStorage.setItem('activeChatId', id)
     dispatch(getChat(id))
     setSidebarOpen(false)
   }
 
   const handleDeleteChat = (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
+    if (activeChat?._id === id) localStorage.removeItem('activeChatId')
     dispatch(deleteChat(id))
   }
 
@@ -77,11 +94,14 @@ export default function ChatPage() {
 
     try {
       if (activeChat) {
-        await dispatch(askInChat({ chatId: activeChat._id, question: q, fileId: selectedFile || undefined }))
+        const res: any = await dispatch(askInChat({ chatId: activeChat._id, question: q, fileId: selectedFile || undefined }))
+        if (askInChat.rejected.match(res)) dispatch(getChat(activeChat._id))
       } else {
         const { payload: newChat }: any = await dispatch(createChat())
         if (newChat) {
-          await dispatch(askInChat({ chatId: newChat._id, question: q, fileId: selectedFile || undefined }))
+          localStorage.setItem('activeChatId', newChat._id)
+          const res: any = await dispatch(askInChat({ chatId: newChat._id, question: q, fileId: selectedFile || undefined }))
+          if (askInChat.rejected.match(res)) dispatch(getChat(newChat._id))
         }
       }
     } finally {
@@ -90,61 +110,76 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-80px)] sm:h-[calc(100vh-88px)] gap-0 relative rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+    <div className="flex h-[calc(100dvh-7.5rem)] relative rounded-md border border-line bg-paper overflow-hidden">
       {sidebarOpen && (
-        <div className="absolute sm:relative z-10 inset-0 sm:inset-auto w-full sm:w-72 border-r border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-sm sm:bg-gray-50 dark:sm:bg-gray-950 flex flex-col shrink-0">
-          <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800">
-            <button
-              onClick={handleNewChat}
-              className="flex items-center justify-center gap-2 w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition mr-2"
-            >
-              <FiPlus size={16} /> New Chat
-            </button>
-            <button onClick={() => setSidebarOpen(false)} className="sm:hidden p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
-              <FiChevronRight />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {chats.map((chat: any) => (
-              <div
-                key={chat._id}
-                onClick={() => handleSelectChat(chat._id)}
-                className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-sm transition ${
-                  activeChat?._id === chat._id
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
+        <>
+          <div
+            className="absolute inset-0 z-20 bg-black/30 sm:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <aside className="absolute sm:relative z-30 sm:z-auto inset-y-0 left-0 w-72 border-r border-line bg-paper flex flex-col shrink-0 animate-rise sm:animate-none">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-mute">Library</p>
+              <button
+                onClick={handleNewChat}
+                className="flex items-center gap-1.5 text-xs font-medium text-pine hover:text-pine-deep transition"
               >
-                <span className="truncate flex-1">{chat.title}</span>
-                <button
-                  onClick={(e) => handleDeleteChat(e, chat._id)}
-                  className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+                <FiPlus size={14} /> New
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {chats.map((chat: any) => (
+                <div
+                  key={chat._id}
+                  onClick={() => handleSelectChat(chat._id)}
+                  className={`group cursor-pointer border-b border-line px-4 py-3 pl-5 transition ${
+                    activeChat?._id === chat._id ? 'border-l-2 border-l-pine bg-pine-tint/40' : 'hover:bg-card'
+                  }`}
                 >
-                  <FiTrash2 size={14} />
-                </button>
-              </div>
-            ))}
-            {chats.length === 0 && (
-              <p className="text-gray-400 text-center text-sm mt-8">No chats yet</p>
-            )}
-          </div>
-        </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`truncate font-serif text-[15px] leading-snug ${activeChat?._id === chat._id ? 'text-pine' : 'text-ink'}`}>
+                      {chat.title}
+                    </p>
+                    <button
+                      onClick={(e) => handleDeleteChat(e, chat._id)}
+                      className="opacity-0 group-hover:opacity-100 transition p-1 text-mute hover:text-error"
+                      aria-label="Delete chat"
+                    >
+                      <FiTrash2 size={13} />
+                    </button>
+                  </div>
+                  <p className="font-mono text-[10px] text-mute mt-1">{formatDate(chat.updatedAt)}</p>
+                </div>
+              ))}
+              {chats.length === 0 && (
+                <div className="px-4 py-10">
+                  <p className="text-sm text-ink">No conversations yet.</p>
+                  <p className="text-xs text-mute mt-1">Start a new chat and it will appear here.</p>
+                </div>
+              )}
+            </div>
+          </aside>
+        </>
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-line bg-paper">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+            className="p-1.5 text-mute hover:text-ink hover:bg-card rounded-md transition"
+            aria-label={sidebarOpen ? 'Close library' : 'Open library'}
           >
-            <FiChevronLeft className={`${sidebarOpen ? '' : 'rotate-180'} transition`} />
+            {sidebarOpen ? <FiChevronLeft size={16} /> : <FiChevronRight size={16} />}
           </button>
-          <div className="relative flex-1 sm:flex-none">
-            <FiFile size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          {activeChat && (
+            <p className="font-serif text-base text-ink truncate hidden sm:block">{activeChat.title}</p>
+          )}
+          <div className="relative ml-auto sm:ml-4">
+            <FiFile size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-mute" />
             <select
               value={selectedFile}
               onChange={(e) => setSelectedFile(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 w-full sm:w-48"
+              className="pl-8 pr-3 py-1.5 bg-card border border-line rounded-md text-sm appearance-none outline-none focus:border-pine focus:ring-2 focus:ring-pine/15 w-full sm:w-48 transition"
             >
               <option value="">All files</option>
               {files?.map((f: any) => (
@@ -154,79 +189,93 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {!activeChat ? (
-            <div className="flex flex-col items-center text-gray-400 mt-20">
-              <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                <FiMessageSquare className="text-3xl" />
-              </div>
-              <p className="text-center text-lg font-medium text-gray-500 dark:text-gray-400">Select a chat or start a new one</p>
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6">
+          {!activeChat && chatLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <span className="w-5 h-5 border-2 border-line border-t-pine rounded-full animate-spin" />
+            </div>
+          ) : !activeChat ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <h2 className="font-serif text-2xl text-ink">Start a conversation</h2>
+              <p className="text-sm text-mute mt-2 max-w-sm">
+                Pick a conversation from the library, or start a new one and ask about your documents.
+              </p>
+              <button
+                onClick={handleNewChat}
+                className="mt-6 flex items-center gap-2 px-4 py-2 bg-pine text-paper font-medium rounded-md text-sm hover:bg-pine-deep transition"
+              >
+                <FiPlus size={15} /> New chat
+              </button>
             </div>
           ) : activeChat.messages?.length === 0 ? (
-            <div className="flex flex-col items-center text-gray-400 mt-20">
-              <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-                <FiMessageSquare className="text-2xl" />
-              </div>
-              <p className="text-lg font-medium text-gray-500 dark:text-gray-400">Ask a question to begin</p>
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <h2 className="font-serif text-2xl text-ink">Ask something about your documents</h2>
+              <p className="text-sm text-mute mt-2 max-w-sm">
+                Answers come from your files only. Amber tabs on the left of each answer mark the source passage.
+              </p>
             </div>
           ) : (
-            activeChat.messages?.map((msg: any, i: number) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-400 text-white flex items-center justify-center text-xs font-bold mr-3 mt-1 shrink-0 shadow-sm">
-                    AI
-                  </div>
-                )}
-                <div
-                  className={`max-w-[85%] sm:max-w-[70%] p-3.5 rounded-2xl whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-br-md'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-md'
-                  }`}
-                >
-                  {msg.role === 'user' ? msg.text : <ChatMessage text={msg.text} />}
+            activeChat.messages?.filter((msg: any) => msg.role === 'assistant').map((msg: any, i: number) => (
+              <div
+                key={i}
+                className="flex w-full items-start gap-0 animate-rise"
+              >
+                <div className="w-9 shrink-0 flex flex-col items-center gap-1.5 pt-1">
+                  {(msg.sources as Source[] | undefined)?.map((s, j) => (
+                    <CitationTab key={j} source={s} index={j} />
+                  ))}
                 </div>
-                {msg.role === 'user' && (
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white flex items-center justify-center text-xs font-bold ml-3 mt-1 shrink-0 shadow-sm">
-                    U
+                <div className="max-w-[85%] sm:max-w-[75%] min-w-0">
+                  <p className="font-mono text-[10px] text-mute mb-1">{formatTime(msg.timestamp)}</p>
+                  <div className="bg-card border border-line rounded-md p-4 text-sm text-ink">
+                    <ChatMessage text={msg.text} dark={dark} />
                   </div>
-                )}
+                </div>
               </div>
             ))
           )}
           {sending && (
-            <div className="flex justify-start items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-400 text-white flex items-center justify-center text-xs font-bold shadow-sm shrink-0">
-                AI
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 p-3.5 rounded-2xl rounded-bl-md">
-                <div className="flex gap-1.5">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="flex justify-start animate-rise">
+              <div className="w-9 shrink-0" />
+              <div className="max-w-[75%]">
+                <div className="bg-card border border-line rounded-md px-4 py-3.5">
+                  <div className="flex gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-mute/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-mute/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-mute/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
                 </div>
+              </div>
+            </div>
+          )}
+          {chatError && (
+            <div className="flex justify-start animate-rise">
+              <div className="w-9 shrink-0" />
+              <div className="max-w-[75%] bg-error/5 border border-error/25 rounded-md px-4 py-3 text-sm text-error">
+                {chatError}
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <div className="flex gap-2 max-w-4xl mx-auto">
+        <div className="px-4 sm:px-8 py-4 border-t border-line bg-paper">
+          <div className="flex gap-2 max-w-3xl">
             <input
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmit()}
-              placeholder={activeChat ? 'Ask a follow-up...' : 'Type your question...'}
-              className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
+              placeholder={activeChat ? 'Ask a follow-up…' : 'Ask about your documents…'}
+              className="flex-1 px-4 py-2.5 bg-card border border-line rounded-md text-sm outline-none placeholder:text-mute/50 focus:border-pine focus:ring-2 focus:ring-pine/15 transition"
               disabled={sending}
             />
             <button
               onClick={handleSubmit}
               disabled={sending || !question.trim()}
-              className="p-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl hover:from-blue-700 hover:to-violet-700 disabled:opacity-50 transition shadow-sm"
+              className="px-3.5 bg-pine text-paper rounded-md hover:bg-pine-deep disabled:opacity-40 transition"
+              aria-label="Send question"
             >
-              <FiSend size={18} />
+              <FiSend size={16} />
             </button>
           </div>
         </div>

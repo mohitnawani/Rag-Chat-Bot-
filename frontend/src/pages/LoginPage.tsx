@@ -1,106 +1,148 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
-import { FiCpu, FiMail, FiLock, FiUser } from 'react-icons/fi'
-import { useAppDispatch, useAppSelector } from '../store'
-import { signup, login, clearError } from '../slices/authSlice'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate, Link, useLocation } from 'react-router'
+import { useEffect } from 'react'
+import { GoogleLogin } from '@react-oauth/google'
+import { login, clearError, checkAuth } from '../slices/authSlice'
+import axiosClient from '../lib/axios'
+import AuthAside from '../components/AuthAside'
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email("Please enter a valid email address"),
+
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(32, "Password must not exceed 32 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(
+      /[@$!%*?&^#()_+\-=[\]{};':"\\|,.<>/?]/,
+      "Password must contain at least one special character"
+    ),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
-  const dispatch = useAppDispatch()
+  const dispatch = useDispatch<any>()
   const navigate = useNavigate()
-  const { loading, error } = useAppSelector((state) => state.auth)
+  const location = useLocation()
+  const { user, loading, error } = useSelector((state: any) => state.auth)
+  const from = (location.state as any)?.from || '/'
 
-  const [isSignup, setIsSignup] = useState(false)
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    dispatch(clearError())
+  useEffect(() => {
+    if (user) navigate(from, { replace: true })
+  }, [user, from, navigate])
 
-    const data = isSignup ? { name, email, password } : { email, password }
-    const action = isSignup ? signup : login
-    const res = await dispatch(action(data))
+  useEffect(() => {
+    return () => { dispatch(clearError()) }
+  }, [dispatch])
 
-    if (action.fulfilled.match(res)) {
-      navigate('/')
+  const onSubmit = (data: LoginFormData) => {
+    dispatch(login(data))
+  }
+
+  const onGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      await axiosClient.post('/auth/google/verify', {
+        token: credentialResponse.credential,
+      })
+      dispatch(checkAuth())
+    } catch (err: any) {
+      console.error('Google login failed', err)
     }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[70vh] px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-lg mb-4">
-            <FiCpu size={24} />
-          </div>
-          <h1 className="text-2xl font-bold">{isSignup ? 'Create Account' : 'Welcome Back'}</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {isSignup ? 'Sign up to start chatting with your documents' : 'Log in to continue where you left off'}
-          </p>
-        </div>
+    <div className="grid lg:grid-cols-2 gap-0 min-h-[calc(100dvh-8.5rem)]">
+      <AuthAside
+        eyebrow="RAG CHATBOT"
+        title="Every answer carries its source."
+        body="Upload a paper, ask anything. The assistant answers only from your documents — and marks the exact passage each answer came from."
+        steps={[
+          'Upload a PDF to your reading list.',
+          'Ask a question about its contents.',
+          'Check the amber tabs — each one points to the source passage.',
+        ]}
+        note="Your documents are private. The model reads only what you give it."
+      />
 
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 space-y-4">
-          {isSignup && (
-            <div className="relative">
-              <FiUser size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="flex items-center justify-center px-4 py-10">
+        <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm">
+          <h1 className="font-serif text-3xl font-semibold">Welcome back</h1>
+          <p className="text-sm text-mute mt-2">Sign in to your account.</p>
+
+          <div className="mt-8 space-y-5">
+            <div>
+              <label className="block text-xs font-medium text-mute mb-1.5">Email</label>
               <input
-                type="text"
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
-                required
+                {...register('email')}
+                type="email"
+                placeholder="you@example.com"
+                className="w-full px-3.5 py-2.5 bg-card border border-line rounded-md text-sm placeholder:text-mute/50 outline-none focus:border-pine focus:ring-2 focus:ring-pine/15 transition"
+              />
+              {errors.email && <p className="text-xs text-error mt-1.5">{errors.email.message}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-mute mb-1.5">Password</label>
+              <input
+                {...register('password')}
+                type="password"
+                placeholder="Your password"
+                className="w-full px-3.5 py-2.5 bg-card border border-line rounded-md text-sm placeholder:text-mute/50 outline-none focus:border-pine focus:ring-2 focus:ring-pine/15 transition"
+              />
+              {errors.password && <p className="text-xs text-error mt-1.5">{errors.password.message}</p>}
+            </div>
+
+            {error && (
+              <div className="p-3 text-sm text-error bg-error/5 border border-error/20 rounded-md">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-pine text-paper font-medium rounded-md text-sm hover:bg-pine-deep disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="h-px bg-line flex-1" />
+              <span className="text-xs text-mute">or continue with</span>
+              <div className="h-px bg-line flex-1" />
+            </div>
+
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={onGoogleSuccess}
+                onError={() => console.log('Login Failed')}
               />
             </div>
-          )}
-          <div className="relative">
-            <FiMail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
-              required
-            />
-          </div>
-          <div className="relative">
-            <FiLock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition"
-              required
-            />
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white rounded-xl hover:from-blue-700 hover:to-violet-700 disabled:opacity-50 font-medium transition"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                Please wait...
-              </span>
-            ) : isSignup ? 'Create Account' : 'Sign In'}
-          </button>
-
-          <p className="text-sm text-center text-gray-500 dark:text-gray-400">
-            {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button type="button" onClick={() => { setIsSignup(!isSignup); dispatch(clearError()) }} className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-              {isSignup ? 'Sign In' : 'Create One'}
-            </button>
+          <p className="text-sm text-mute mt-6">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-pine hover:text-pine-deep underline underline-offset-2 font-medium">
+              Create one
+            </Link>
           </p>
         </form>
       </div>
