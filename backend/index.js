@@ -13,6 +13,14 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url} -> ${res.statusCode} (${Date.now() - start}ms)`);
+  });
+  next();
+});
+
 const authRoutes = require("./src/routes/authRoutes");
 const uploadRoutes = require("./src/routes/uploadRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");

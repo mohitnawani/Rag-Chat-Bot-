@@ -19,6 +19,7 @@ exports.forgotPassword = async (req, res) => {
     }
 
     if (!redis) {
+      console.error("forgotPassword: Redis not configured");
       return res.status(500).json({ message: "Password reset is unavailable right now" });
     }
 
@@ -37,6 +38,7 @@ exports.forgotPassword = async (req, res) => {
 
     res.json({ message: "If the email exists, a reset link has been sent" });
   } catch (err) {
+    console.error("forgotPassword error:", err);
     res.status(500).json({ message: "Failed to send reset email", error: err.message });
   }
 };
