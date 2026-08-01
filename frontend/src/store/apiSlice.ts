@@ -48,6 +48,56 @@ export const askInChat = createAsyncThunk(
   },
 )
 
+export const askInChatStream = createAsyncThunk(
+  'api/askInChatStream',
+  async (
+    { chatId, question, fileId, onDelta }: { chatId: string; question: string; fileId?: string; onDelta?: (text: string) => void },
+    { rejectWithValue },
+  ) => {
+    try {
+      const res = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ question, chatId, fileId }),
+      })
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.message || 'The answer could not be generated. Try again.')
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let sep
+        while ((sep = buffer.indexOf('\n\n')) !== -1) {
+          const rawEvent = buffer.slice(0, sep)
+          buffer = buffer.slice(sep + 2)
+          const dataLine = rawEvent.split('\n').find((l) => l.startsWith('data:'))
+          if (!dataLine) continue
+          const data = dataLine.slice(5).trim()
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.event_type === 'delta' && typeof parsed.text === 'string') {
+              onDelta?.(parsed.text)
+            }
+          } catch {
+            // ignore malformed events
+          }
+        }
+      }
+      return chatId
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'The answer could not be generated. Try again.')
+    }
+  },
+)
+
 interface ApiState {
   files: any[]
   chats: any[]
@@ -112,6 +162,11 @@ const apiSlice = createSlice({
         }
       })
       .addCase(askInChat.rejected, (state, action) => {
+        state.chatError = action.payload as string || 'The answer could not be generated. Try again.'
+      })
+      .addCase(askInChatStream.pending, (state) => { state.chatError = null })
+      .addCase(askInChatStream.fulfilled, () => {})
+      .addCase(askInChatStream.rejected, (state, action) => {
         state.chatError = action.payload as string || 'The answer could not be generated. Try again.'
       })
   },

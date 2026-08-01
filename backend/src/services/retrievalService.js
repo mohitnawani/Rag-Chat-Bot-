@@ -28,10 +28,9 @@ function buildHistoryBlock(history) {
   return `Previous conversation:\n${lines.join("\n")}\n\n`;
 }
 
-async function generateAnswer(question, context, chatHistory) {
-  const ai = await getGenAI();
+function buildPrompt(question, context, chatHistory) {
   const historyBlock = buildHistoryBlock(chatHistory);
-const prompt = `${historyBlock}You are a helpful RAG-based document assistant. Follow these rules when responding:
+  return `${historyBlock}You are a helpful RAG-based document assistant. Follow these rules when responding:
 
 1. **Greetings/small talk** (e.g. "hi", "hello", "how are you"): Respond warmly and briefly introduce yourself — e.g. "Hello! I'm a RAG chatbot that can answer questions about your uploaded document. What would you like to know?" Do not use the context for this.
 
@@ -49,6 +48,11 @@ ${context}
 Question: ${question}
 
 Answer:`;
+}
+
+async function generateAnswer(question, context, chatHistory) {
+  const ai = await getGenAI();
+  const prompt = buildPrompt(question, context, chatHistory);
 
   const interaction = await ai.interactions.create({
     model: "gemini-3.6-flash",
@@ -82,4 +86,4 @@ async function query(question, fileId, chatHistory, k = 5) {
   };
 }
 
-module.exports = { query, retrieveDocuments, buildContext, generateAnswer };
+module.exports = { query, retrieveDocuments, buildContext, buildPrompt, generateAnswer };

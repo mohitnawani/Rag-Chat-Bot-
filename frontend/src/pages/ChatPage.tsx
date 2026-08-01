@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
-  listChats, createChat, getChat, deleteChat, askInChat, getFiles, clearActiveChat,
+  listChats, createChat, getChat, deleteChat, askInChatStream, getFiles, clearActiveChat,
 } from '../store/apiSlice'
 import { FiSend, FiPlus, FiTrash2, FiChevronLeft, FiChevronRight, FiFile } from 'react-icons/fi'
 import MessageBubble, { ChatEmptyState } from '../components/MessageBubble'
@@ -28,6 +28,8 @@ export default function ChatPage() {
   const [selectedFile, setSelectedFile] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sending, setSending] = useState(false)
+  const [streamText, setStreamText] = useState('')
+  const streamBufferRef = useRef('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -38,8 +40,35 @@ export default function ChatPage() {
   }, [dispatch])
 
   useEffect(() => {
+    if (!sending) return
+    const timer = setInterval(() => {
+      const buffer = streamBufferRef.current
+      if (!buffer) return
+      setStreamText((prev) => {
+        const totalWords = (buffer.match(/ /g)?.length ?? 0) + 1
+        const wordsPerTick = Math.max(1, Math.ceil(totalWords / 100))
+        let end = -1
+        let words = 0
+        for (let i = 0; i < buffer.length; i++) {
+          if (buffer[i] === ' ') {
+            words++
+            if (words === wordsPerTick) {
+              end = i + 1
+              break
+            }
+          }
+        }
+        if (end === -1) return prev
+        streamBufferRef.current = buffer.slice(end)
+        return prev + buffer.slice(0, end)
+      })
+    }, 30)
+    return () => clearInterval(timer)
+  }, [sending])
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activeChat?.messages, sending])
+  }, [activeChat?.messages, sending, streamText])
 
   const handleNewChat = () => {
     dispatch(clearActiveChat())
@@ -61,22 +90,36 @@ export default function ChatPage() {
   const handleSubmit = async () => {
     if (!question.trim() || sending) return
     setSending(true)
+    setStreamText('')
+    streamBufferRef.current = ''
     const q = question
     setQuestion('')
 
     try {
-      if (activeChat) {
-        const res: any = await dispatch(askInChat({ chatId: activeChat._id, question: q, fileId: selectedFile || undefined }))
-        if (askInChat.rejected.match(res)) dispatch(getChat(activeChat._id))
-      } else {
+      let chatId = activeChat?._id
+      if (!chatId) {
         const { payload: newChat }: any = await dispatch(createChat())
-        if (newChat) {
-          localStorage.setItem('activeChatId', newChat._id)
-          const res: any = await dispatch(askInChat({ chatId: newChat._id, question: q, fileId: selectedFile || undefined }))
-          if (askInChat.rejected.match(res)) dispatch(getChat(newChat._id))
-        }
+        if (!newChat) return
+        chatId = newChat._id
+        localStorage.setItem('activeChatId', chatId)
       }
+
+      const res: any = await dispatch(askInChatStream({
+        chatId,
+        question: q,
+        fileId: selectedFile || undefined,
+        onDelta: (t) => { streamBufferRef.current += t },
+      }))
+
+      dispatch(getChat(chatId))
+      dispatch(listChats())
+      if (askInChatStream.rejected.match(res)) setStreamText('')
     } finally {
+      setStreamText((prev) => {
+        const remaining = streamBufferRef.current
+        streamBufferRef.current = ''
+        return prev + remaining
+      })
       setSending(false)
     }
   }
@@ -193,7 +236,7 @@ export default function ChatPage() {
             ))
           )}
           {sending && (
-            <MessageBubble role="assistant" content="" isStreaming />
+            <MessageBubble role="assistant" content={streamText} isStreaming />
           )}
           {chatError && (
             <div className="flex justify-start animate-rise">
