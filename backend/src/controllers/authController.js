@@ -1,11 +1,82 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/user");
 const generateToken = require("../middleware/tokenMiddleware");
 const redis = require("../config/redis");
+const { sendPasswordResetEmail } = require("../services/mailer");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+const RESET_TOKEN_TTL = 15 * 60;
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    if (!redis) {
+      return res.status(500).json({ message: "Password reset is unavailable right now" });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user || !user.password) {
+      return res.json({ message: "If the email exists, a reset link has been sent" });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    await redis.set(`passwordReset:${tokenHash}`, user.email, "EX", RESET_TOKEN_TTL);
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${rawToken}`;
+    await sendPasswordResetEmail(user.email, resetUrl);
+
+    res.json({ message: "If the email exists, a reset link has been sent" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to send reset email", error: err.message });
+  }
+};
+
+exports.resetpassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+    if (!redis) {
+      return res.status(500).json({ message: "Password reset is unavailable right now" });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const key = `passwordReset:${tokenHash}`;
+
+    const email = await redis.get(key);
+    if (!email) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user || !user.password) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    user.password = await bcrypt.hash(newPassword.trim(), 10);
+    await user.save();
+
+    await redis.del(key);
+
+    res.json({ message: "Password reset successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Password reset failed", error: err.message });
+  }
+};
 
 exports.googleVerify = async (req, res) => {
   try {
@@ -55,7 +126,6 @@ exports.googleVerify = async (req, res) => {
   }
 };
 
-
 exports.signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -84,7 +154,6 @@ exports.signup = async (req, res) => {
     });
 
     res.status(201).json({
-      token,
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
@@ -121,7 +190,6 @@ exports.login = async (req, res) => {
     });
 
     res.json({
-      token,
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {

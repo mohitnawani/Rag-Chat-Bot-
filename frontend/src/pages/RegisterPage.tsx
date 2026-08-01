@@ -7,6 +7,10 @@ import { useEffect } from 'react'
 import { signup, clearError } from '../slices/authSlice'
 import { FiCheck, FiX } from 'react-icons/fi'
 import AuthAside from '../components/AuthAside'
+import axiosClient from '../lib/axios'
+import { GoogleLogin } from '@react-oauth/google'
+import { checkAuth } from '../slices/authSlice'
+
 
 const signupSchema = z
   .object({
@@ -94,6 +98,17 @@ export default function RegisterPage() {
     dispatch(signup({ name, email, password }))
   }
 
+   const onGoogleSuccess = async (credentialResponse: any) => {
+      try {
+        await axiosClient.post('/auth/google/verify', {
+          token: credentialResponse.credential,
+        })
+        dispatch(checkAuth())
+      } catch (err: any) {
+        console.error('Google login failed', err)
+      }
+    }
+
   return (
     <div className="grid lg:grid-cols-2 gap-0 min-h-[calc(100dvh-8.5rem)]">
       <AuthAside
@@ -108,12 +123,12 @@ export default function RegisterPage() {
         note="One account. Your files stay yours."
       />
 
-      <div className="flex items-center justify-center px-4 py-10">
-        <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm">
+      <div className="flex overflow-y-auto px-4 py-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm m-auto">
           <h1 className="font-serif text-3xl font-semibold">Create account</h1>
           <p className="text-sm text-mute mt-2">Sign up to start uploading.</p>
 
-          <div className="mt-8 space-y-5">
+          <div className="mt-6 space-y-4">
             <div>
               <label className="block text-xs font-medium text-mute mb-1.5">Name</label>
               <input
@@ -174,12 +189,24 @@ export default function RegisterPage() {
             </button>
           </div>
 
-          <p className="text-sm text-mute mt-6">
-            Already have an account?{' '}
-            <Link to="/login" className="text-pine hover:text-pine-deep underline underline-offset-2 font-medium">
-              Sign in
-            </Link>
-          </p>
+          <div className="flex items-center gap-3 mt-6">
+            <div className="h-px bg-line flex-1" />
+            <span className="text-xs text-mute">or continue with</span>
+            <div className="h-px bg-line flex-1" />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 mt-6">
+            <GoogleLogin
+              onSuccess={onGoogleSuccess}
+              onError={() => console.log('Login Failed')}
+            />
+            <p className="text-sm text-mute text-right">
+              Already have an account?{' '}
+              <Link to="/login" className="text-pine hover:text-pine-deep underline underline-offset-2 font-medium">
+                Sign in
+              </Link>
+            </p>
+          </div>
         </form>
       </div>
     </div>
